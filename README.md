@@ -1,112 +1,93 @@
-# Node App — Jenkins Freestyle Deployment (Step-by-step)
+# Node.js App Deployment using Jenkins Freestyle Projects
 
-> This README describes how to deploy a simple Node.js application using **Jenkins Freestyle** jobs. It includes setup for Node.js / npm / PM2 for the `jenkins` user, three Jenkins jobs (pull, install deps, deploy), GitHub webhook trigger, and where to add screenshots.
-
----
-
-## 🧾 Overview
-
-We will create three Jenkins freestyle jobs:
-
-1. `node-pull-repo` — pulls code from GitHub (no build steps).
-2. `node-install-deps` — runs `npm install` in the pulled workspace.
-3. `node-deploy-app` — starts/restarts the app using PM2.
-
-Jenkins will run commands as the `jenkins` user. We'll install Node.js, npm, and PM2 globally for that user so `sudo` is not required inside Jenkins jobs.
+This guide will help you step-by-step to set up Jenkins and deploy a simple Node.js app. It is written in a beginner-friendly way so anyone can follow it easily.
 
 ---
 
-## 📁 Repository
+## 🧩 What You Will Do
 
-Use this repo URL (example used in this guide):
+We’ll create **four Jenkins jobs** to manage everything from setup to deployment:
 
-```
-https://github.com/iamtruptimane/node-js-app-CICD.git
-```
-
-Replace with your repo URL and branch as needed.
+1. **set-up-env** → installs Node.js, npm, and PM2.
+2. **node-pull-repo** → pulls your code from GitHub.
+3. **node-install-deps** → installs dependencies.
+4. **node-deploy-app** → runs or restarts the app using PM2.
 
 ---
 
-## ⚙️ Prerequisites (on server)
+## ⚙️ Job 0 — set-up-env (Prepare the environment)
 
-Run the following on the server (as a user with `sudo` privileges) to prepare the environment for the `jenkins` user:
+This job makes sure your Jenkins server has Node.js, npm, and PM2 installed so the `jenkins` user can run them directly.
+
+### Steps:
+
+1. Go to Jenkins → **New Item** → choose **Freestyle Project** → name it `set-up-env`.
+2. In **Build Steps**, select **Execute Shell** and paste these commands:
 
 ```bash
-# Update package lists (optional but recommended)
-sudo apt update
+# Update system packages
+sudo apt update -y
 
-# Install Node.js
+# Install Node.js (use nodejs or node based on your system)
 sudo apt install -y nodejs
 
 # Install npm
 sudo apt install -y npm
 
-# Install PM2 globally (for jenkins user) — run as the jenkins user or install globally
-# If you run as root, PM2 will be owned by root. To make PM2 available to jenkins, either:
-# 1) run the following as the 'jenkins' user (recommended), or
-# 2) change npm global prefix for jenkins.
-
-# Switch to jenkins user and install pm2 globally
+# Install PM2 globally for Jenkins user
+# This makes PM2 available everywhere, so you can use it in any directory.
 sudo su - jenkins -s /bin/bash -c "npm install -g pm2"
 
-# Verify installations (as jenkins)
+# Check versions to make sure everything worked
 sudo su - jenkins -s /bin/bash -c "node -v && npm -v && pm2 -v"
 ```
 
-> **Notes:**
->
-> * Installing PM2 as the `jenkins` user ensures Jenkins can run `pm2 start` without `sudo`.
-> * If your system requires a specific Node.js version, consider using NodeSource or `nvm` for version control.
+### Why we use `-g` while installing PM2:
 
----
+* The `-g` flag installs PM2 globally, so you can run the `pm2` command from **any directory**.
+* Without `-g`, PM2 would only work inside the specific project folder.
 
-## 🔐 Permissions & Paths
+> If you skip `-g`, you can still run PM2 locally using `npx pm2 start app.js`, but global installation is easier for Jenkins.
 
-This guide assumes Jenkins workspace is located at:
+3. Click **Save** and **Build Now**.
 
-```
-/var/lib/jenkins/workspace/node-pull-repo
-```
-
-Make sure the `jenkins` user owns the workspace and has permission to run `npm` and `pm2`:
-
-```bash
-sudo chown -R jenkins:jenkins /var/lib/jenkins/workspace
-```
-
-If your Jenkins home is elsewhere, update the `cd` paths in the job shell steps accordingly.
-
----
-
-## 🧱 Job 1 — node-pull-repo (Pull repository)
-
-1. Jenkins → **New Item** → **Freestyle project** → Name: `node-pull-repo`
-2. **Source Code Management** → **Git** → Repository URL: `https://github.com/iamtruptimane/node-js-app-CICD.git`
-3. **Branch Specifier**: `main` (or your default branch)
-4. **Build Triggers**: Check **GitHub hook trigger for GITScm polling** (to enable webhook-triggered builds)
-5. **Build**: Leave **Build Steps** empty (job only pulls code).
-6. Click **Save**.
+After this job succeeds, Jenkins will be ready to build and deploy Node.js apps.
 
 **Screenshot placeholder:**
 
 ```
-![Screenshot: Create Job - node-pull-repo](screenshots/jenkins-create-node-pull-repo.png)
+![Screenshot: set-up-env job](screenshots/set-up-env-job.png)
 ```
 
 ---
 
-## 🧩 Job 2 — node-install-deps (Install dependencies)
+## 🧾 Job 1 — node-pull-repo (Pull Repository)
 
-1. Jenkins → **New Item** → **Freestyle project** → Name: `node-install-deps`
-2. **Build Triggers** → **Build after other projects are built** → Enter `node-pull-repo` (so it runs after pulling)
-3. **Build Steps** → **Execute shell** → Script:
+1. Create a new Freestyle project named `node-pull-repo`.
+2. In **Source Code Management**, select **Git**.
+
+   * Repository URL: `https://github.com/iamtruptimane/node-js-app-CICD.git`
+   * Branch: `main`
+3. In **Build Triggers**, check **GitHub hook trigger for GITScm polling**.
+4. Leave **Build Steps** empty — this job only pulls the code.
+5. Click **Save**.
+
+**Screenshot placeholder:**
+
+```
+![Screenshot: node-pull-repo job](screenshots/node-pull-repo.png)
+```
+
+---
+
+## 🧱 Job 2 — node-install-deps (Install Dependencies)
+
+1. Create a new Freestyle project named `node-install-deps`.
+2. In **Build Triggers**, select **Build after other projects are built** → enter `node-pull-repo`.
+3. In **Build Steps → Execute Shell**, paste:
 
 ```bash
-# Navigate to the pulled repository workspace
-cd "/var/lib/jenkins/workspace/node-pull-repo"
-
-# Install dependencies
+cd /var/lib/jenkins/workspace/node-pull-repo
 npm install
 ```
 
@@ -115,32 +96,21 @@ npm install
 **Screenshot placeholder:**
 
 ```
-![Screenshot: Configure node-install-deps Build Step](screenshots/jenkins-node-install-deps-build-step.png)
+![Screenshot: node-install-deps job](screenshots/node-install-deps.png)
 ```
 
 ---
 
-## 🚀 Job 3 — node-deploy-app (Deploy application)
+## 🚀 Job 3 — node-deploy-app (Deploy the App)
 
-1. Jenkins → **New Item** → **Freestyle project** → Name: `node-deploy-app`
-2. **Build Triggers** → **Build after other projects are built** → Enter `node-install-deps`
-3. **Build Steps** → **Execute shell** → Script:
+1. Create a new Freestyle project named `node-deploy-app`.
+2. In **Build Triggers**, choose **Build after other projects are built** → enter `node-install-deps`.
+3. In **Build Steps → Execute Shell**, paste:
 
 ```bash
-# Optionally call previous job (not necessary if you chain builds)
-# cd to workspace
-cd "/var/lib/jenkins/workspace/node-pull-repo"
-
-# Start or restart the app using PM2
+cd /var/lib/jenkins/workspace/node-pull-repo
 pm2 start app.js --name node-app || pm2 restart node-app
-
-# Save pm2 process list so it survives restarts (optional but recommended)
 pm2 save
-
-# If you want PM2 to resurrect on server boot, generate startup script (runs once)
-# Do this as the jenkins user. Example for systemd:
-# sudo su - jenkins -s /bin/bash -c "pm2 startup systemd -u jenkins --hp /var/lib/jenkins"
-# Then follow the printed command (it will ask to run as root once to register the systemd script).
 ```
 
 4. Click **Save**.
@@ -148,76 +118,82 @@ pm2 save
 **Screenshot placeholder:**
 
 ```
-![Screenshot: Configure node-deploy-app Build Step](screenshots/jenkins-node-deploy-app-build-step.png)
+![Screenshot: node-deploy-app job](screenshots/node-deploy-app.png)
 ```
 
 ---
 
-## 🔁 GitHub Webhook (for auto build on push)
+## 🔁 Setup GitHub Webhook (Auto Build on Push)
 
-1. In your GitHub repo → **Settings** → **Webhooks** → **Add webhook**
-2. **Payload URL**: `http://<JENKINS_HOST>/github-webhook/`
-3. **Content type**: `application/json`
-4. **Which events**: `Just the push event` (or choose `Let me select individual events`)
+1. Go to your GitHub repo → **Settings** → **Webhooks** → **Add webhook**.
+2. In **Payload URL**, enter:
+
+   ```
+   http://<your-jenkins-server>/github-webhook/
+   ```
+3. Set **Content type** to `application/json`.
+4. Select **Just the push event**.
 5. Click **Add webhook**.
 
 **Screenshot placeholder:**
 
 ```
-![Screenshot: GitHub webhook settings](screenshots/github-webhook.png)
+![Screenshot: GitHub webhook](screenshots/github-webhook.png)
 ```
 
 ---
 
-## ✅ Verify the flow
+## ✅ Test the Full Flow
 
-1. Push code to the configured branch on GitHub.
-2. Check the webhook delivery status in GitHub (it should show 200 OK).
-3. In Jenkins, watch the build queue and the console output for `node-pull-repo`, `node-install-deps`, and `node-deploy-app`.
-4. Check PM2 process list: `pm2 list` (as `jenkins` user) and `pm2 logs node-app` for runtime logs.
+1. Run the first job (`set-up-env`) once to prepare the system.
+2. Push code to GitHub → it should trigger `node-pull-repo` automatically.
+3. After that, Jenkins will run `node-install-deps` → `node-deploy-app`.
+4. To check the running app:
+
+   ```bash
+   sudo su - jenkins -s /bin/bash -c "pm2 list"
+   ```
+5. To see logs:
+
+   ```bash
+   sudo su - jenkins -s /bin/bash -c "pm2 logs node-app"
+   ```
 
 ---
 
-## 🐞 Troubleshooting
+## 🧠 Common Problems and Fixes
 
-* **npm not found in Jenkins job**: Ensure `npm` is in PATH for `jenkins` user. Verify with `sudo su - jenkins -s /bin/bash -c "which npm && npm -v"`.
-* **PM2 permission errors**: Make sure PM2 was installed for `jenkins` user and that `jenkins` owns the pm2 files. Re-install as `jenkins` if needed.
-* **App fails to start**: Check `pm2 logs node-app` and `node` version compatibility.
-* **Port already in use**: Verify the application port and stop any other process using it.
+| Problem               | Cause                   | Fix                                             |
+| --------------------- | ----------------------- | ----------------------------------------------- |
+| npm not found         | Jenkins PATH issue      | Install npm for `jenkins` user or use full path |
+| PM2 permission denied | Installed as root       | Reinstall PM2 as `jenkins` user                 |
+| App not starting      | Wrong file name or port | Verify `app.js` path and free the port          |
 
 ---
 
-## 📂 Screenshots folder (project structure suggestion)
+## 📂 Recommended Folder for Screenshots
 
-Add screenshots to your repository in a `screenshots` folder so they are easily viewable in README:
+Keep screenshots in a folder named `screenshots/` inside your repo, like this:
 
 ```
-repo-root/
-  ├─ README.md
-  └─ screenshots/
-      ├─ jenkins-create-node-pull-repo.png
-      ├─ jenkins-node-install-deps-build-step.png
-      ├─ jenkins-node-deploy-app-build-step.png
-      └─ github-webhook.png
+project-root/
+ ├─ README.md
+ └─ screenshots/
+     ├─ set-up-env-job.png
+     ├─ node-pull-repo.png
+     ├─ node-install-deps.png
+     ├─ node-deploy-app.png
+     └─ github-webhook.png
 ```
 
-> **Tip:** Use the exact filenames used in the image placeholders above so Markdown will render them automatically on GitHub.
-
 ---
 
-## 📌 Extras & Recommendations
+## 🏁 Summary
 
-* Use **blue-green** or **rolling** deployment strategies for zero-downtime deployments.
-* Consider using the **Jenkins Pipeline** (Declarative or Scripted) for better reproducibility and versioning of your deployment logic.
-* If you need specific Node.js versions, install `nvm` for the `jenkins` user and set the desired Node version in the job shell steps.
+After completing all steps:
 
----
+* Jenkins can pull your code from GitHub automatically.
+* Dependencies will install automatically.
+* Your Node.js app will start or restart automatically using PM2.
 
-## ✍️ If you want me to:
-
-* Add real screenshots into these placeholders — upload the images here and I will place them in the README and update image links.
-* Convert this into a Jenkins Pipeline `Jenkinsfile` — I can write a Declarative Pipeline that does the same steps.
-
----
-
-*Prepared for quick copy/paste. Replace any paths, repo URLs, and filenames to match your setup.*
+You now have a complete **CI/CD setup for a Node.js app** using **Jenkins Freestyle Projects**!
