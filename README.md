@@ -84,6 +84,20 @@ pm2 save
 
 4. Click **Save**.
 
+
+✅ To Check if the Freestyle Project Ran Successfully
+
+1.Copy the Public IP of your server.
+
+2.Check if port 3000 is active/running.
+
+3.Open your browser and enter:
+
+     <public-ip>:3000
+
+
+4.If the project opens in the browser — your freestyle project is running successfully.
+
 ---
 
 ## 🔁 Setup Job Connections
